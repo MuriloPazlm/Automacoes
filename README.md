@@ -1,149 +1,136 @@
-# ADDPAINELv7 — Automação para Adição de TCLs e Filtragem por BRICK
+# Automação de Painel — ADD & LIMPEZA (v7)
 
-Este script em Python automatiza a preparação de uma planilha de **Adição de TCLs** a partir de uma base Excel, **separando e validando códigos BRICK**, aplicando um **VLOOKUP automatizado**, gerando uma aba filtrada (**ADICAO**) apenas com registros relevantes, e **salvando o arquivo em uma estrutura de pastas por ciclo de marketing**, com nome de arquivo único e incremental.
+Este repositório reúne dois scripts em Python que automatizam o fluxo de **adição** e **limpeza** de TCLs em planilhas Excel,
+utilizando `openpyxl` e regras de ciclos de marketing para organização automática dos arquivos.
+
+- **ADDPAINELv7.py** — Prepara a planilha para **adição** de TCLs a partir de uma base, valida e separa BRICKs, cria a aba `ADICAO`
+  com registros filtrados e salva o arquivo em pastas por **ciclo de marketing**.
+- **limpezaPainelv7.py** — Realiza **limpeza**/remoção de TCLs não pertencentes à lista de BRICKs informada, gerando a aba `Limpeza`
+  resumida e salvando em pastas por **ciclo de marketing**.
 
 > **Tecnologias:** Python 3.x • openpyxl • `re`, `datetime`, `os`, `shutil`
 
 ---
 
-## ✨ Principais Funcionalidades
+##  Visão Geral
 
-- **Entrada interativa:**
-  - Solicita o **Setor do Representante** (texto livre).
-  - Solicita a lista de **códigos BRICK** (aceita separados por **espaço, vírgula ou quebra de linha**).
+### ADDPAINELv7.py
+- **Entrada interativa:** Setor do Representante + lista de BRICKs (espaço, vírgula ou quebra de linha).
+- **Normalização:** Formata para `BR_XXXXXXX` (prefixo `BR_` + 7 dígitos), ignorando vazios.
+- **Base Excel:** Carrega `BASE_ADD.xlsx` (aba ativa), **separa BRICKs** em colunas quando houver múltiplos na mesma célula.
+- **VLOOKUP:** Insere duas colunas auxiliares (lista de BRICKs e fórmula `IFERROR(VLOOKUP(...))`).
+- **Aba `ADICAO`:** Cria/limpa, localiza cabeçalhos, **filtra linhas** onde qualquer BRICK aparece na lista informada e **remove duplicidades por `Account ID_18`**.
+- **Salvar/organizar:** Gera nome único (`ADD TCLs- <Setor>.xlsx`, com versões `_v2`, `_v3`...), detecta o ciclo pela data de criação e **move** para a subpasta do ciclo.
 
-- **Normalização de BRICKs:**
-  - Formata automaticamente cada código para o padrão `BR_XXXXXXX` (prefixo `BR_` + **7 dígitos** com `zfill`).
-  - Ignora entradas vazias e espaços extras.
-
-- **Preparação da base (Excel / openpyxl):**
-  - Carrega a planilha base (`BASE_ADD.xlsx`) e usa a **aba ativa**.
-  - **Separa BRICKs** quando há múltiplos códigos na mesma célula (divide por espaço e espalha em colunas adicionais).
-  - Calcula **quantas colunas** são necessárias para acomodar todos os BRICKs separados por linha.
-
-- **VLOOKUP automatizado:**
-  - Insere **duas colunas auxiliares** na direita do bloco de BRICKs.
-  - Preenche a primeira coluna auxiliar com a lista de BRICKs formatados.
-  - Na segunda, escreve uma **fórmula de VLOOKUP** (com `IFERROR`) que faz a validação/consulta dos BRICKs por linha.
-  - Obs.: A fórmula é escrita como texto na célula, pronta para cálculo no Excel.
-
-- **Criação da aba `ADICAO`:**
-  - Gera/limpa a aba `ADICAO` e escreve um cabeçalho padronizado:
-    - `Ciclo de Marketing`, `Alvo: Território`, `Account ID_18`, `Nome da conta`, `Specialty 1`, `Contact ID_18`, `Licença Médica Legal`.
-  - **Filtra linhas** da base original onde **qualquer** coluna de BRICK (após separação) aparece nos BRICKs informados.
-  - **Elimina duplicidades por `Account ID_18`**, mantendo apenas a primeira ocorrência.
-
-- **Salvar com nome único e organizar por ciclo:**
-  - Salva o arquivo como `ADD TCLs- <Setor>.xlsx` (ex.: `ADD TCLs- Sul.xlsx`).
-  - Se já existir, cria versão incremental: `ADD TCLs- <Setor>_v2.xlsx`, `..._v3.xlsx`, etc.
-  - Detecta o **ciclo de marketing** pelo timestamp de criação do arquivo e **move** para a pasta do ciclo correspondente:
-    - `CICLO 07 (2025-07-18 a 2025-08-15)`
-    - `CICLO 08 (2025-08-18 a 2025-09-15)`
-    - `CICLO 09 (2025-09-16 a 2025-10-14)`
-    - `CICLO 10 (2025-10-15 a 2025-11-12)`
-    - `CICLO 11 (2025-11-13 a 2025-12-17)`
+### limpezaPainelv7.py
+- **Entrada interativa:** Setor do Representante + lista de BRICKs.
+- **Separação na base:** Descobre a quantidade máxima de BRICKs por célula (divide por espaço) e **insere colunas** para espalhar os valores.
+- **VLOOKUP auxiliar:** Adiciona duas colunas (códigos do usuário + célula para fórmula `IFERROR(VLOOKUP(...))`).
+- **Aba `Limpeza`:** Cria/limpa e **coleta linhas que NÃO contêm** BRICKs informados, gerando um resumo com primeiros nomes e ciclo.
+- **Salvar/organizar:** Salva como `DELETE TCLs- <Setor>.xlsx` e **move** para a subpasta do ciclo correspondente.
 
 ---
 
-## 📂 Estrutura de Pastas e Arquivos
+##  Fluxo de Trabalho Recomendido
 
-- **`arquivo_origem`**: `C:\\Users\\pazlimx1\\OneDrive - Abbott\\Documents\\AUTOMACAO\\ADD TCL\\BASE\\BASE_ADD.xlsx`
-- **`pasta_base` (saída)**: `C:\\Users\\pazlimx1\\OneDrive - Abbott\\Documents\\AUTOMACAO\\ADICAO PAINEL`
-  - `ADD TCLs- <Setor>.xlsx` ou `ADD TCLs- <Setor>_vN.xlsx`
-  - `CICLO XX\\ADD TCLs- <Setor>.xlsx` (arquivo movido para a subpasta do ciclo)
-
-> Ajuste esses caminhos nas constantes do script se necessário.
+1. **Adicionar (ADDPAINELv7):** Gere a aba `ADICAO` com contas/contatos que DEVEM ser adicionados conforme BRICKs informados.
+2. **Limpar (limpezaPainelv7):** Gere a aba `Limpeza` com contas/contatos que NÃO pertencem aos BRICKs informados (candidatos a remoção/ajuste).
+3. **Publicar/arquivar:** Cada saída é salva/movida para a pasta do ciclo, mantendo o histórico por período.
 
 ---
 
-## 🔧 Requisitos
+## Estrutura de Pastas e Arquivos
+
+- **Saída (`pasta_base`)**: caminho configurável nos scripts
+  - `ADD TCLs- <Setor>.xlsx` / `ADD TCLs- <Setor>_vN.xlsx`
+  - `DELETE TCLs- <Setor>.xlsx`
+  - `CICLO XX/` (subpastas de ciclos; os arquivos são movidos para cá após a criação)
+
+> No `ADDPAINELv7.py` os caminhos padrão usam Windows + OneDrive; ajuste para o seu ambiente.
+
+---
+
+## Requisitos
 
 - **Python 3.x**
-- **openpyxl** (leitura/escrita de arquivos Excel `.xlsx`)
-- Acesso de escrita/leitura aos caminhos configurados.
+- **openpyxl** (leitura/escrita `.xlsx`)
 
-Instalação (se necessário):
+Instalação:
 ```bash
 pip install openpyxl
 ```
 
 ---
 
-## ▶️ Como Usar
+## Como Usar
 
-1. Garanta que o arquivo **`BASE_ADD.xlsx`** está no caminho configurado e que a aba ativa contém:
-   - Cabeçalhos com os nomes esperados em português (p.ex. `Account ID_18`, `Ciclo de Marketing`, etc.).
-   - Coluna **G** (índice 7) contendo os BRICKs (podem estar múltiplos por célula).
-
-2. Execute o script:
+### 1) ADDPAINELv7.py
 ```bash
 python ADDPAINELv7.py
 ```
+Responda:
+- **Setor do Representante** (ex.: `Sul`)
+- **Lista de BRICKs** (ex.: `123, 456 789` ou cada um em uma linha)
 
-3. Informe:
-   - **Setor do Representante** (ex.: `Sul`)
-   - **Lista de BRICKs** (ex.: `123, 456 789` ou em linhas diferentes)
+Saída:
+- Arquivo `ADD TCLs- <Setor>.xlsx` com aba `ADICAO` filtrada e sem duplicidades de `Account ID_18`.
+- Movido para a subpasta do ciclo detectado.
 
-4. Ao finalizar:
-   - O script salvará o arquivo nomeado em `pasta_base`, criará versão se já existir, e **moverá** para a subpasta do **ciclo** correspondente conforme a data de criação do arquivo.
+### 2) limpezaPainelv7.py
+Antes, configure `pasta_base` e `arquivo_origem` no topo do arquivo.
+```bash
+python limpezaPainelv7.py
+```
+Responda:
+- **Setor do Representante**
+- **Lista de BRICKs**
+
+Saída:
+- Arquivo `DELETE TCLs- <Setor>.xlsx` com aba `Limpeza` contendo itens fora dos BRICKs.
+- Movido para a subpasta do ciclo detectado.
 
 ---
 
-## 🧠 Como o script funciona (fluxo)
+## Cabeçalhos esperados (na base Excel)
 
-1. **Configura ciclos** (datas início/fim) e converte para `datetime`.
-2. **Coleta entradas** do usuário e normaliza BRICKs (`BR_` + 7 dígitos).
-3. **Carrega a base** via `openpyxl` e identifica a coluna de BRICK (fixa: **7**).
-4. **Separa BRICKs** por espaço em colunas novas (quantidade dinâmica).
-5. **Insere colunas auxiliares** e escreve fórmula de VLOOKUP com `IFERROR`.
-6. **Cria/limpa a aba `ADICAO`**, mapeia índices das colunas de interesse pelo cabeçalho, filtra linhas por presença de BRICK e remove duplicidades de `Account ID_18`.
-7. **Salva com nome único**, determina o ciclo pela data de criação e **move** o arquivo para a pasta do ciclo.
-8. **Mensagens de erro amigáveis** para casos de arquivo aberto ou permissões.
-
----
-
-## 📎 Cabeçalhos esperados na base
-
-O script busca estes nomes de coluna (sensíveis a grafia):
 - `Ciclo de Marketing`
-- `Alvo: Território`
+- `Alvo: Território` / `Alvo: Alvos`
 - `Account ID_18`
 - `Nome da conta`
 - `Specialty 1`
 - `Contact ID_18`
 - `Licença Médica Legal`
+- `Lista de clientes-alvo: Nome`
 
-> Se a base usar nomes diferentes, atualize o dicionário `cabecalhos` na função `criar_aba_adicao`.
-
----
-
-## ⚠️ Limitações e Observações
-
-- A **fórmula de VLOOKUP** escrita nas células assume que o Excel calculará após abrir o arquivo (o script não avalia fórmulas).
-- O **separador de BRICK** é **espaço** na célula; se houver vírgulas/pontos e vírgulas dentro da planilha base, ajuste a função `separar_bricks`.
-- O índice da coluna de BRICK está **fixo em 7** (`colunaBrick = 7`); altere se a estrutura da base mudar.
-- O **ciclo** é determinado pela **data de criação** do arquivo salvo; se precisar usar outra referência (p.ex. data de sistema), adapte `salvar_e_mover_arquivo`.
-- Os caminhos são **Windows + OneDrive**; em outros ambientes, atualize `pasta_base` e `arquivo_origem`.
+> Se a nomenclatura variar, ajuste os dicionários de cabeçalhos nas funções que criam as abas `ADICAO` e `Limpeza`.
 
 ---
 
-## 🗺️ Roadmap (idéias de evolução)
+## Limitações e Observações
 
-- Parametrizar `colunaBrick` e nomes de cabeçalhos via arquivo `.ini` ou `.yaml`.
-- Suportar separadores múltiplos na base (`;`, `,`) além de espaço.
-- Validar BRICKs por **regex** (apenas dígitos) antes de formatar.
-- Exportar a aba `ADICAO` como arquivo separado (ex.: `ADICAO_<Setor>.xlsx`).
-- Log estruturado (arquivo `.log`) com contagem de linhas filtradas e tempo de execução.
-- Testes unitários com `pytest` para `formatar_bricks`, `separar_bricks` e `gerar_nome_unico`.
+- As **fórmulas de VLOOKUP** são escritas como texto; a avaliação ocorre no Excel ao abrir o arquivo.
+- A **coluna de BRICK** na base é tratada como **índice 7 (coluna G)**; ajuste `colunaBrick` se necessário.
+- Em `limpezaPainelv7.py`, **pasta_base** e **arquivo_origem** estão vazios por padrão — **configure antes de rodar**.
+- A detecção de ciclo usa a **data de criação** do arquivo salvo; adapte para outra referência se preciso.
+- Separador de BRICK na base: **espaço**; para outros separadores, ajuste as funções de split.
 
 ---
 
-## 📄 Licença
+## Roadmap
+
+- Parametrização via `.ini`/`.yaml` (caminhos, cabeçalhos, coluna de BRICK).
+- Exportar `ADICAO`/`Limpeza` como arquivos separados adicionais.
+- Logs detalhados e métricas (linhas filtradas, tempo de execução).
+- Testes unitários (`pytest`) para funções de formatação e separação.
+
+---
+
+## Licença
 
 Defina uma licença (ex.: MIT) conforme sua necessidade.
 
 ---
 
-## 👤 Autor
+## Autor
 
 Murilo Paz Lima — Automação de suporte administrativo (São Paulo, SP)
